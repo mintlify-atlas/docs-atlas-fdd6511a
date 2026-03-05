@@ -1,0 +1,190 @@
+---
+title: 'Database Schema'
+description: 'Complete database schema reference for GAOTEV using Prisma ORM'
+---
+
+## Overview
+
+The GAOTEV project uses Prisma ORM with PostgreSQL as the database provider. The schema is defined in `prisma/schema.prisma` and provides a type-safe interface for database operations.
+
+## Database Provider
+
+<ParamField path="provider" type="string" default="postgresql">
+  The database provider used by GAOTEV. PostgreSQL is configured for production-grade reliability and performance.
+</ParamField>
+
+<ParamField path="url" type="string" required>
+  Database connection URL from the `DATABASE_URL` environment variable.
+</ParamField>
+
+<ParamField path="directUrl" type="string">
+  Direct database connection URL from the `DIRECT_URL` environment variable, used for migrations and connection pooling bypass.
+</ParamField>
+
+## Schema Configuration
+
+```prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+```
+
+The schema uses the Prisma Client generator for JavaScript/TypeScript applications and connects to PostgreSQL using environment variables for secure credential management.
+
+## Models
+
+### User Model
+
+The `User` model represents authenticated users in the GAOTEV system.
+
+```prisma
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+}
+```
+
+#### Field Reference
+
+<ResponseField name="id" type="String" required>
+  Unique identifier for the user.
+  
+  **Attributes:**
+  - `@id` - Primary key
+  - `@default(cuid())` - Auto-generated CUID (Collision-resistant Unique Identifier)
+</ResponseField>
+
+<ResponseField name="email" type="String" required>
+  User's email address used for authentication.
+  
+  **Attributes:**
+  - `@unique` - Ensures no duplicate email addresses in the database
+</ResponseField>
+
+<ResponseField name="password" type="String" required>
+  Hashed password for user authentication. Stored using bcrypt hashing for security.
+  
+  <Warning>
+    Never store plain text passwords. Always hash passwords before storing them in the database.
+  </Warning>
+</ResponseField>
+
+<ResponseField name="createdAt" type="DateTime" required>
+  Timestamp of when the user account was created.
+  
+  **Attributes:**
+  - `@default(now())` - Automatically set to the current timestamp on creation
+</ResponseField>
+
+## Field Attributes
+
+<Accordion title="@id - Primary Key">
+  Marks a field as the primary key for the model. Each model must have exactly one primary key.
+  
+  ```prisma
+  id String @id @default(cuid())
+  ```
+</Accordion>
+
+<Accordion title="@default() - Default Values">
+  Sets a default value for a field when a new record is created.
+  
+  **Common defaults:**
+  - `@default(cuid())` - Generate a CUID
+  - `@default(uuid())` - Generate a UUID
+  - `@default(now())` - Set current timestamp
+  - `@default(autoincrement())` - Auto-increment integer
+  
+  ```prisma
+  createdAt DateTime @default(now())
+  ```
+</Accordion>
+
+<Accordion title="@unique - Unique Constraint">
+  Ensures that the field value is unique across all records in the table.
+  
+  ```prisma
+  email String @unique
+  ```
+</Accordion>
+
+## Schema Management
+
+### Generating Prisma Client
+
+After modifying the schema, regenerate the Prisma Client:
+
+```bash
+npx prisma generate
+```
+
+### Viewing the Schema
+
+Inspect your database schema visually:
+
+```bash
+npx prisma studio
+```
+
+### Schema Validation
+
+Validate your schema without applying changes:
+
+```bash
+npx prisma validate
+```
+
+## Type Safety
+
+Prisma automatically generates TypeScript types based on your schema:
+
+```typescript
+import { User } from '@prisma/client'
+
+// User type is automatically inferred with all fields
+const user: User = {
+  id: 'cuid123',
+  email: 'user@example.com',
+  password: 'hashed_password',
+  createdAt: new Date()
+}
+```
+
+## Best Practices
+
+<Card title="Security" icon="shield">
+  - Always hash passwords before storing (use bcrypt or argon2)
+  - Use environment variables for database credentials
+  - Enable SSL for database connections in production
+</Card>
+
+<Card title="Performance" icon="gauge">
+  - Add indexes to frequently queried fields
+  - Use connection pooling with `directUrl` for serverless environments
+  - Optimize queries with select and include statements
+</Card>
+
+<Card title="Maintenance" icon="wrench">
+  - Keep schema migrations in version control
+  - Document schema changes in migration files
+  - Use descriptive field and model names
+</Card>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Prisma Client" icon="database" href="/api/database/prisma">
+    Learn how to use Prisma Client for database queries
+  </Card>
+  <Card title="Migrations" icon="code-branch" href="/api/database/prisma#migrations">
+    Manage database schema changes with migrations
+  </Card>
+</CardGroup>

@@ -1,0 +1,478 @@
+---
+title: 'NextAuth.js Configuration'
+description: 'Technical reference for the NextAuth.js authentication configuration in GAOTEV'
+---
+
+## Configuration Overview
+
+The NextAuth.js configuration is located at `/app/api/auth/[...nextauth]/route.ts` and exports both GET and POST handlers for the authentication API.
+
+## Complete Configuration
+
+Here's the full NextAuth.js configuration used in GAOTEV:
+
+```typescript
+import NextAuth from "next-auth"
+import CredentialsProvider from "next-auth/providers/credentials"
+import { PrismaClient } from "@prisma/client"
+import bcrypt from "bcrypt"
+
+const prisma = new PrismaClient()
+
+const handler = NextAuth({
+  providers: [
+    CredentialsProvider({
+      name: "Credentials",
+      credentials: {
+        email: { label: "Email", type: "text" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          return null
+        }
+
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email },
+        })
+
+        if (!user) return null
+
+        const isValid = await bcrypt.compare(
+          credentials.password,
+          user.password
+        )
+
+        if (!isValid) return null
+
+        return {
+          id: user.id,
+          email: user.email,
+        }
+      },
+    }),
+  ],
+  session: {
+    strategy: "jwt",
+  },
+  secret: process.env.NEXTAUTH_SECRET,
+})
+
+export { handler as GET, handler as POST }
+```
+
+## Configuration Properties
+
+### Providers
+
+<ParamField path="providers" type="array" required>
+  Array of authentication providers. GAOTEV uses a single credentials provider.
+</ParamField>
+
+#### CredentialsProvider Configuration
+
+<ParamField path="name" type="string" default="Credentials">
+  Display name for the authentication provider.
+</ParamField>
+
+<ParamField path="credentials" type="object" required>
+  Defines the credential fields required for authentication.
+  
+  <Expandable title="Credentials schema">
+    <ParamField path="email" type="object">
+      Email field configuration.
+      
+      <ParamField path="label" type="string">
+        Display label for the field: `"Email"`
+      </ParamField>
+      
+      <ParamField path="type" type="string">
+        HTML input type: `"text"`
+      </ParamField>
+    </ParamField>
+    
+    <ParamField path="password" type="object">
+      Password field configuration.
+      
+      <ParamField path="label" type="string">
+        Display label for the field: `"Password"`
+      </ParamField>
+      
+      <ParamField path="type" type="string">
+        HTML input type: `"password"`
+      </ParamField>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="authorize" type="async function" required>
+  Core authentication function that validates credentials and returns user data.
+</ParamField>
+
+### Session Configuration
+
+<ParamField path="session.strategy" type="string" required>
+  Session storage strategy. GAOTEV uses `"jwt"` for stateless, token-based sessions.
+  
+  **Available strategies:**
+  - `"jwt"` - Session data stored in encrypted JWT tokens (used in GAOTEV)
+  - `"database"` - Session data stored in database (requires adapter)
+</ParamField>
+
+### Secret
+
+<ParamField path="secret" type="string" required>
+  Secret key used to encrypt JWT tokens. Must be set via the `NEXTAUTH_SECRET` environment variable.
+</ParamField>
+
+<Warning>
+  Never hardcode the secret in your source code. Always use environment variables and keep the secret secure.
+</Warning>
+
+## Authorize Function
+
+The `authorize` function is the core of the authentication logic. It receives credentials from the client and returns a user object if authentication succeeds, or `null` if it fails.
+
+### Function Signature
+
+```typescript
+async authorize(credentials: Record<string, string> | undefined): Promise<User | null>
+```
+
+### Implementation Details
+
+#### Step 1: Validate Input
+
+```typescript
+if (!credentials?.email || !credentials?.password) {
+  return null
+}
+```
+
+Ensures both email and password are provided. Returns `null` if either is missing.
+
+#### Step 2: Query Database
+
+```typescript
+const user = await prisma.user.findUnique({
+  where: { email: credentials.email },
+})
+
+if (!user) return null
+```
+
+Searches for a user with the provided email address using Prisma ORM. Returns `null` if no user is found.
+
+#### Step 3: Verify Password
+
+```typescript
+const isValid = await bcrypt.compare(
+  credentials.password,
+  user.password
+)
+
+if (!isValid) return null
+```
+
+Compares the provided password with the hashed password stored in the database using bcrypt. Returns `null` if passwords don't match.
+
+#### Step 4: Return User Object
+
+```typescript
+return {
+  id: user.id,
+  email: user.email,
+}
+```
+
+If authentication succeeds, returns a user object containing the ID and email. This object will be available in the session.
+
+<Note>
+  Only return non-sensitive user information in the user object. Never include passwords or other sensitive data.
+</Note>
+
+## User Object Structure
+
+The user object returned by the `authorize` function defines what data is available in the session:
+
+<ResponseField name="id" type="string" required>
+  Unique user identifier from the database. Used to identify the user across sessions.
+</ResponseField>
+
+<ResponseField name="email" type="string" required>
+  User's email address. Used for display and identification purposes.
+</ResponseField>
+
+### Accessing User Data in Session
+
+The returned user object is embedded in the session and can be accessed client-side:
+
+```javascript
+const { data: session } = useSession()
+
+if (session) {
+  console.log(session.user.id)    // User ID
+  console.log(session.user.email) // User email
+}
+```
+
+## Route Handlers
+
+NextAuth.js requires both GET and POST route handlers for the App Router:
+
+```typescript
+export { handler as GET, handler as POST }
+```
+
+<ParamField path="GET" type="RouteHandler">
+  Handles GET requests to authentication endpoints:
+  - `/api/auth/session` - Retrieve current session
+  - `/api/auth/csrf` - Get CSRF token
+  - `/api/auth/providers` - List available providers
+  - `/api/auth/signin` - Display sign-in page (if using built-in pages)
+</ParamField>
+
+<ParamField path="POST" type="RouteHandler">
+  Handles POST requests to authentication endpoints:
+  - `/api/auth/signin/credentials` - Authenticate with credentials
+  - `/api/auth/signout` - Sign out and clear session
+  - `/api/auth/callback/credentials` - Handle authentication callback
+</ParamField>
+
+## Dependencies
+
+### Required Packages
+
+```json
+{
+  "dependencies": {
+    "next-auth": "^4.x.x",
+    "@prisma/client": "^5.x.x",
+    "bcrypt": "^5.x.x"
+  }
+}
+```
+
+### PrismaClient
+
+```typescript
+import { PrismaClient } from "@prisma/client"
+const prisma = new PrismaClient()
+```
+
+Used to query the database for user records. Ensure your Prisma schema includes a User model with `email` and `password` fields.
+
+### bcrypt
+
+```typescript
+import bcrypt from "bcrypt"
+```
+
+Provides secure password hashing and comparison. Used to verify that the provided password matches the stored hash.
+
+## Environment Variables
+
+<ParamField path="NEXTAUTH_SECRET" type="string" required>
+  Secret key for encrypting JWT tokens. Generate using:
+  
+  ```bash
+  openssl rand -base64 32
+  ```
+  
+  Add to `.env`:
+  
+  ```bash
+  NEXTAUTH_SECRET=your_generated_secret_here
+  ```
+</ParamField>
+
+<ParamField path="NEXTAUTH_URL" type="string">
+  Base URL of your application. Required in production.
+  
+  ```bash
+  NEXTAUTH_URL=https://your-domain.com
+  ```
+</ParamField>
+
+<ParamField path="DATABASE_URL" type="string" required>
+  Prisma database connection string. Required for user authentication.
+  
+  ```bash
+  DATABASE_URL="postgresql://user:password@localhost:5432/gaotev"
+  ```
+</ParamField>
+
+## Security Best Practices
+
+### Password Storage
+
+<Check>
+  **DO**: Use bcrypt to hash passwords before storing them in the database.
+</Check>
+
+```typescript
+import bcrypt from "bcrypt"
+
+const hashedPassword = await bcrypt.hash(password, 10)
+```
+
+<Warning>
+  **DON'T**: Store plain-text passwords in the database. Always hash them first.
+</Warning>
+
+### Secret Management
+
+<Check>
+  **DO**: Use strong, randomly generated secrets and store them in environment variables.
+</Check>
+
+<Warning>
+  **DON'T**: Commit `.env` files to version control or share secrets publicly.
+</Warning>
+
+### Input Validation
+
+<Check>
+  **DO**: Validate all credentials before processing them.
+</Check>
+
+```typescript
+if (!credentials?.email || !credentials?.password) {
+  return null
+}
+```
+
+### Error Messages
+
+<Check>
+  **DO**: Return generic error messages that don't reveal whether an email exists.
+</Check>
+
+```typescript
+// Good: Generic error message
+setError("Credenciales incorrectas")
+
+// Bad: Reveals if email exists
+setError("Email no encontrado")
+```
+
+## Extending the Configuration
+
+### Adding Additional User Fields
+
+To include more user data in the session:
+
+```typescript
+return {
+  id: user.id,
+  email: user.email,
+  name: user.name,        // Add name
+  role: user.role,        // Add role
+  image: user.image,      // Add profile image
+}
+```
+
+### Callbacks
+
+You can add callbacks to customize JWT and session behavior:
+
+```typescript
+const handler = NextAuth({
+  // ... other config
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id
+        token.role = user.role
+      }
+      return token
+    },
+    async session({ session, token }) {
+      if (session.user) {
+        session.user.id = token.id
+        session.user.role = token.role
+      }
+      return session
+    },
+  },
+})
+```
+
+### Custom Pages
+
+To use custom sign-in and error pages:
+
+```typescript
+const handler = NextAuth({
+  // ... other config
+  pages: {
+    signIn: '/login',
+    signOut: '/logout',
+    error: '/auth/error',
+  },
+})
+```
+
+## Troubleshooting
+
+### Common Issues
+
+<AccordionGroup>
+  <Accordion title="Session is null after signing in">
+    **Possible causes:**
+    - Missing `NEXTAUTH_SECRET` environment variable
+    - `authorize` function returning `null` due to validation failure
+    - Database connection issues
+    
+    **Solution:** Check your environment variables and ensure the database is accessible.
+  </Accordion>
+  
+  <Accordion title="Cannot read properties of undefined (reading 'email')">
+    **Cause:** Accessing session data before it's loaded or when user is not authenticated.
+    
+    **Solution:** Always check session status and existence before accessing user data:
+    
+    ```javascript
+    if (session?.user?.email) {
+      console.log(session.user.email)
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="CSRF token verification failed">
+    **Cause:** CSRF token mismatch, often due to incorrect origin or proxy configuration.
+    
+    **Solution:** Ensure `NEXTAUTH_URL` matches your application URL, especially in production.
+  </Accordion>
+  
+  <Accordion title="Prisma Client initialization error">
+    **Cause:** Database connection issues or missing schema.
+    
+    **Solution:** Run migrations and verify `DATABASE_URL` is correct:
+    
+    ```bash
+    npx prisma migrate dev
+    npx prisma generate
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Authentication Overview" icon="shield" href="/api/auth/overview">
+    Learn about authentication flow and client-side usage
+  </Card>
+  
+  <Card title="NextAuth.js Documentation" icon="book" href="https://next-auth.js.org">
+    Official NextAuth.js documentation
+  </Card>
+  
+  <Card title="Prisma Documentation" icon="database" href="https://www.prisma.io/docs">
+    Learn more about Prisma ORM
+  </Card>
+  
+  <Card title="bcrypt Documentation" icon="lock" href="https://www.npmjs.com/package/bcrypt">
+    bcrypt password hashing library
+  </Card>
+</CardGroup>

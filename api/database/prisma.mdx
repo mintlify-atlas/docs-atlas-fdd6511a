@@ -1,0 +1,541 @@
+---
+title: 'Prisma Client'
+description: 'Complete guide to using Prisma Client for type-safe database operations in GAOTEV'
+---
+
+## Overview
+
+Prisma Client is an auto-generated, type-safe query builder for TypeScript and Node.js. It provides a clean API for database operations with full IntelliSense support.
+
+## Setup
+
+### Installation
+
+Prisma is already configured in the GAOTEV project. The required dependencies are:
+
+```bash
+npm install @prisma/client
+npm install --save-dev prisma dotenv
+```
+
+### Configuration
+
+The Prisma configuration is defined in `prisma.config.ts`:
+
+```typescript
+import "dotenv/config";
+import { defineConfig } from "prisma/config";
+
+export default defineConfig({
+  schema: "prisma/schema.prisma",
+  migrations: {
+    path: "prisma/migrations",
+  },
+  datasource: {
+    url: process.env["DATABASE_URL"],
+    directUrl: process.env["DIRECT_URL"],
+  },
+});
+```
+
+<ParamField path="schema" type="string" default="prisma/schema.prisma">
+  Path to the Prisma schema file.
+</ParamField>
+
+<ParamField path="migrations.path" type="string" default="prisma/migrations">
+  Directory where migration files are stored.
+</ParamField>
+
+<ParamField path="datasource.url" type="string" required>
+  Database connection URL for standard queries.
+</ParamField>
+
+<ParamField path="datasource.directUrl" type="string">
+  Direct database connection URL, bypassing connection poolers. Required for migrations in serverless environments.
+</ParamField>
+
+## Initializing Prisma Client
+
+### Basic Setup
+
+Create a new Prisma Client instance:
+
+```typescript
+import { PrismaClient } from "@prisma/client"
+
+const prisma = new PrismaClient()
+```
+
+### Production Example
+
+From the GAOTEV authentication route (`app/api/auth/[...nextauth]/route.ts`):
+
+```typescript
+import NextAuth from "next-auth"
+import CredentialsProvider from "next-auth/providers/credentials"
+import { PrismaClient } from "@prisma/client"
+import bcrypt from "bcrypt"
+
+const prisma = new PrismaClient()
+
+const handler = NextAuth({
+  providers: [
+    CredentialsProvider({
+      name: "Credentials",
+      credentials: {
+        email: { label: "Email", type: "text" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          return null
+        }
+
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email },
+        })
+
+        if (!user) return null
+
+        const isValid = await bcrypt.compare(
+          credentials.password,
+          user.password
+        )
+
+        if (!isValid) return null
+
+        return {
+          id: user.id,
+          email: user.email,
+        }
+      },
+    }),
+  ],
+  session: {
+    strategy: "jwt",
+  },
+  secret: process.env.NEXTAUTH_SECRET,
+})
+
+export { handler as GET, handler as POST }
+```
+
+### Singleton Pattern (Recommended)
+
+For Next.js applications, use a singleton pattern to avoid creating multiple Prisma Client instances:
+
+```typescript
+import { PrismaClient } from '@prisma/client'
+
+const globalForPrisma = global as unknown as { prisma: PrismaClient }
+
+export const prisma =
+  globalForPrisma.prisma ||
+  new PrismaClient({
+    log: ['query', 'error', 'warn'],
+  })
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+```
+
+## Query Operations
+
+### Find Unique
+
+Find a single record by a unique field:
+
+<CodeGroup>
+```typescript Real Example from GAOTEV
+const user = await prisma.user.findUnique({
+  where: { email: credentials.email },
+})
+```
+
+```typescript By ID
+const user = await prisma.user.findUnique({
+  where: { id: 'cuid123' },
+})
+```
+
+```typescript With Selected Fields
+const user = await prisma.user.findUnique({
+  where: { email: 'user@example.com' },
+  select: {
+    id: true,
+    email: true,
+    createdAt: true,
+    // password excluded for security
+  },
+})
+```
+</CodeGroup>
+
+### Find Many
+
+Retrieve multiple records:
+
+```typescript
+// Get all users
+const users = await prisma.user.findMany()
+
+// With filtering
+const recentUsers = await prisma.user.findMany({
+  where: {
+    createdAt: {
+      gte: new Date('2024-01-01'),
+    },
+  },
+  orderBy: {
+    createdAt: 'desc',
+  },
+  take: 10,
+})
+```
+
+### Find First
+
+Find the first record matching criteria:
+
+```typescript
+const user = await prisma.user.findFirst({
+  where: {
+    email: {
+      contains: '@example.com',
+    },
+  },
+})
+```
+
+## CRUD Operations
+
+### Create
+
+<CodeGroup>
+```typescript Single Record
+const user = await prisma.user.create({
+  data: {
+    email: 'newuser@example.com',
+    password: 'hashed_password',
+  },
+})
+```
+
+```typescript With Password Hashing
+import bcrypt from 'bcrypt'
+
+const hashedPassword = await bcrypt.hash(password, 10)
+
+const user = await prisma.user.create({
+  data: {
+    email: 'newuser@example.com',
+    password: hashedPassword,
+  },
+})
+```
+
+```typescript Multiple Records
+const users = await prisma.user.createMany({
+  data: [
+    { email: 'user1@example.com', password: 'hashed1' },
+    { email: 'user2@example.com', password: 'hashed2' },
+  ],
+})
+```
+</CodeGroup>
+
+### Read
+
+```typescript
+// By unique field
+const user = await prisma.user.findUnique({
+  where: { id: 'cuid123' },
+})
+
+// By non-unique field
+const users = await prisma.user.findMany({
+  where: { email: { contains: 'example.com' } },
+})
+
+// Count records
+const userCount = await prisma.user.count()
+```
+
+### Update
+
+<CodeGroup>
+```typescript Single Record
+const updatedUser = await prisma.user.update({
+  where: { id: 'cuid123' },
+  data: {
+    email: 'newemail@example.com',
+  },
+})
+```
+
+```typescript Multiple Records
+const result = await prisma.user.updateMany({
+  where: {
+    createdAt: {
+      lt: new Date('2023-01-01'),
+    },
+  },
+  data: {
+    // Update fields
+  },
+})
+```
+
+```typescript Upsert (Create or Update)
+const user = await prisma.user.upsert({
+  where: { email: 'user@example.com' },
+  update: {
+    password: 'new_hashed_password',
+  },
+  create: {
+    email: 'user@example.com',
+    password: 'hashed_password',
+  },
+})
+```
+</CodeGroup>
+
+### Delete
+
+```typescript
+// Delete single record
+const deletedUser = await prisma.user.delete({
+  where: { id: 'cuid123' },
+})
+
+// Delete multiple records
+const result = await prisma.user.deleteMany({
+  where: {
+    email: {
+      contains: 'spam',
+    },
+  },
+})
+```
+
+## Type Safety
+
+Prisma Client provides full type safety with TypeScript:
+
+```typescript
+import { User } from '@prisma/client'
+
+// Fully typed result
+const user: User | null = await prisma.user.findUnique({
+  where: { email: 'user@example.com' },
+})
+
+// Type error if field doesn't exist
+const invalid = await prisma.user.findUnique({
+  where: { nonExistentField: 'value' }, // TypeScript error
+})
+
+// Select creates a new type
+const publicUser = await prisma.user.findUnique({
+  where: { id: 'cuid123' },
+  select: {
+    id: true,
+    email: true,
+  },
+})
+// Type: { id: string; email: string } | null
+```
+
+## Migrations
+
+### Development Workflow
+
+<Accordion title="1. Create Migration">
+  Create a new migration after modifying your schema:
+  
+  ```bash
+  npx prisma migrate dev --name add_user_model
+  ```
+  
+  This command:
+  - Creates a new migration file
+  - Applies the migration to your database
+  - Regenerates Prisma Client
+</Accordion>
+
+<Accordion title="2. Apply Migrations">
+  Apply pending migrations:
+  
+  ```bash
+  npx prisma migrate deploy
+  ```
+  
+  Use this in production environments to apply migrations.
+</Accordion>
+
+<Accordion title="3. Reset Database">
+  Reset your database (development only):
+  
+  ```bash
+  npx prisma migrate reset
+  ```
+  
+  <Warning>
+    This will delete all data and reapply all migrations. Only use in development.
+  </Warning>
+</Accordion>
+
+<Accordion title="4. Migration Status">
+  Check migration status:
+  
+  ```bash
+  npx prisma migrate status
+  ```
+</Accordion>
+
+### Common Migration Commands
+
+```bash
+# Create and apply migration
+npx prisma migrate dev --name description_of_change
+
+# Apply migrations in production
+npx prisma migrate deploy
+
+# Check migration status
+npx prisma migrate status
+
+# Reset database (dev only)
+npx prisma migrate reset
+
+# Create migration without applying
+npx prisma migrate dev --create-only
+```
+
+## Prisma Studio
+
+Prisma Studio is a visual database browser:
+
+```bash
+npx prisma studio
+```
+
+This opens a web interface at `http://localhost:5555` where you can:
+- Browse and filter records
+- Create, update, and delete data
+- Inspect relationships
+- Test queries
+
+## Advanced Features
+
+### Transactions
+
+Execute multiple operations atomically:
+
+```typescript
+const result = await prisma.$transaction(async (tx) => {
+  const user = await tx.user.create({
+    data: {
+      email: 'user@example.com',
+      password: 'hashed_password',
+    },
+  })
+
+  // Additional operations...
+  
+  return user
+})
+```
+
+### Raw Queries
+
+Execute raw SQL when needed:
+
+```typescript
+// Raw query
+const users = await prisma.$queryRaw`
+  SELECT * FROM "User" WHERE email LIKE ${`%@example.com`}
+`
+
+// Raw execute
+const result = await prisma.$executeRaw`
+  UPDATE "User" SET "updatedAt" = NOW()
+`
+```
+
+### Middleware
+
+Add middleware for logging, timing, or data transformation:
+
+```typescript
+prisma.$use(async (params, next) => {
+  const before = Date.now()
+  const result = await next(params)
+  const after = Date.now()
+  
+  console.log(`Query ${params.model}.${params.action} took ${after - before}ms`)
+  
+  return result
+})
+```
+
+## Best Practices
+
+<Card title="Connection Management" icon="plug">
+  - Use a singleton pattern in serverless environments
+  - Call `prisma.$disconnect()` when shutting down
+  - Configure connection pooling for high-traffic applications
+</Card>
+
+<Card title="Query Optimization" icon="rocket">
+  - Use `select` to fetch only needed fields
+  - Avoid N+1 queries with `include`
+  - Use `findUnique` instead of `findFirst` when possible
+  - Add database indexes for frequently queried fields
+</Card>
+
+<Card title="Error Handling" icon="triangle-exclamation">
+  - Handle `PrismaClientKnownRequestError` for unique constraints
+  - Check for null results from `findUnique`
+  - Use transactions for complex operations
+  - Log errors with context for debugging
+</Card>
+
+<Card title="Security" icon="lock">
+  - Never expose raw passwords
+  - Sanitize user input before queries
+  - Use parameterized queries (Prisma does this automatically)
+  - Validate data before database operations
+</Card>
+
+## Error Handling
+
+```typescript
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
+
+try {
+  const user = await prisma.user.create({
+    data: {
+      email: 'existing@example.com',
+      password: 'hashed_password',
+    },
+  })
+} catch (error) {
+  if (error instanceof PrismaClientKnownRequestError) {
+    if (error.code === 'P2002') {
+      console.error('Unique constraint violation')
+    }
+  }
+  throw error
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Database Schema" icon="table" href="/api/database/schema">
+    View the complete database schema reference
+  </Card>
+  <Card title="Prisma Documentation" icon="book" href="https://www.prisma.io/docs">
+    Official Prisma documentation
+  </Card>
+</CardGroup>

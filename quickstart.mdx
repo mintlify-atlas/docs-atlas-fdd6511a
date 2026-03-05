@@ -1,80 +1,336 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get GAOTEV running on your local machine in minutes
 ---
 
-## Get started in three steps
+Get your GAOTEV management system up and running locally. This guide will walk you through installation, configuration, and your first login.
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
+Before you begin, ensure you have the following installed:
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Node.js" icon="node-js">
+    Version 20.0.0 or higher
+  </Card>
+  <Card title="npm" icon="box">
+    Comes with Node.js (or use yarn/pnpm)
+  </Card>
+  <Card title="PostgreSQL" icon="database">
+    Version 12 or higher running locally or remotely
+  </Card>
+  <Card title="Git" icon="code-branch">
+    For cloning the repository
+  </Card>
 </CardGroup>
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+## Installation Steps
+
+<Steps>
+  <Step title="Clone the repository">
+    Clone the GAOTEV repository to your local machine:
+    
+    ```bash
+    git clone https://github.com/Gusivelin/GAOTEV.git
+    cd GAOTEV
+    ```
+  </Step>
+  
+  <Step title="Install dependencies">
+    Install all required npm packages. GAOTEV uses the following main dependencies:
+    
+    - **Next.js 16.1.6** - React framework
+    - **NextAuth.js 4.24.13** - Authentication
+    - **Prisma 6.19.2** - ORM and database toolkit
+    - **React 19.2.3** - UI library
+    - **Tailwind CSS 4** - Styling
+    - **bcrypt 6.0.0** - Password hashing
+    
+    <CodeGroup>
+    ```bash npm
+    npm install
+    ```
+    
+    ```bash yarn
+    yarn install
+    ```
+    
+    ```bash pnpm
+    pnpm install
+    ```
+    </CodeGroup>
+  </Step>
+  
+  <Step title="Configure environment variables">
+    Create a `.env` file in the root directory with your database and authentication settings:
+    
+    ```bash .env
+    # Database connection URLs
+    DATABASE_URL="postgresql://user:password@localhost:5432/gaotev"
+    DIRECT_URL="postgresql://user:password@localhost:5432/gaotev"
+    
+    # NextAuth.js configuration
+    NEXTAUTH_SECRET="your-secret-key-here"
+    NEXTAUTH_URL="http://localhost:3000"
+    ```
+    
+    <Warning>
+    Generate a secure `NEXTAUTH_SECRET` using:
+    ```bash
+    openssl rand -base64 32
+    ```
+    Never commit your `.env` file to version control.
+    </Warning>
+  </Step>
+  
+  <Step title="Set up PostgreSQL database">
+    Create a new PostgreSQL database for GAOTEV:
+    
+    ```bash
+    # Connect to PostgreSQL
+    psql -U postgres
+    
+    # Create database
+    CREATE DATABASE gaotev;
+    
+    # Exit psql
+    \q
+    ```
+    
+    Make sure your `DATABASE_URL` in `.env` matches your PostgreSQL credentials.
+  </Step>
+  
+  <Step title="Run database migrations">
+    Set up your database schema using Prisma migrations:
+    
+    ```bash
+    npx prisma migrate dev
+    ```
+    
+    This command will:
+    - Read the schema from `prisma/schema.prisma`
+    - Create the `User` table with the following structure:
+    
+    ```prisma schema.prisma
+    model User {
+      id        String   @id @default(cuid())
+      email     String   @unique
+      password  String
+      createdAt DateTime @default(now())
+    }
+    ```
+    
+    - Apply the migration to your database
+    - Generate the Prisma Client for type-safe queries
+  </Step>
+  
+  <Step title="Seed a test user (Optional)">
+    To create a test user, you can use Prisma Studio or create a seed script:
+    
+    ```bash
+    npx prisma studio
+    ```
+    
+    Or create a seed script `prisma/seed.ts`:
+    
+    ```typescript seed.ts
+    import { PrismaClient } from '@prisma/client'
+    import bcrypt from 'bcrypt'
+    
+    const prisma = new PrismaClient()
+    
+    async function main() {
+      const hashedPassword = await bcrypt.hash('demo123', 10)
+      
+      const user = await prisma.user.create({
+        data: {
+          email: 'admin@demo.com',
+          password: hashedPassword,
+        },
+      })
+      
+      console.log('Created test user:', user.email)
+    }
+    
+    main()
+      .catch(console.error)
+      .finally(() => prisma.$disconnect())
+    ```
+    
+    Run the seed:
+    ```bash
+    npx tsx prisma/seed.ts
+    ```
+  </Step>
+  
+  <Step title="Start the development server">
+    Launch the application in development mode:
+    
+    ```bash
+    npm run dev
+    ```
+    
+    The application will start on `http://localhost:3000`. You should see output like:
+    
+    ```bash
+    ▲ Next.js 16.1.6
+    - Local:        http://localhost:3000
+    - Network:      http://192.168.1.x:3000
+    
+    ✓ Ready in 2.1s
+    ```
+  </Step>
+  
+  <Step title="Access the application">
+    Open your browser and navigate to `http://localhost:3000`. You'll be automatically redirected to the login page.
+    
+    If you created a test user in Step 6, you can log in with:
+    - **Email**: `admin@demo.com`
+    - **Password**: `demo123`
+  </Step>
+</Steps>
+
+## Logging In
+
+The login page uses NextAuth.js credentials provider for authentication. Here's how the sign-in flow works:
+
+```jsx page.jsx
+const handleSubmit = async (e) => {
+  e.preventDefault()
+  setError("")
+
+  const result = await signIn("credentials", {
+    email,
+    password,
+    redirect: false,
+  })
+
+  if (result?.ok) {
+    router.push("/dashboard")
+  } else {
+    setError("Credenciales incorrectas")
+  }
+}
+```
+
+After successful authentication, you'll be redirected to the dashboard at `/dashboard`.
+
+## Route Protection
+
+GAOTEV uses Next.js middleware to protect routes. The middleware checks for a valid session before allowing access:
+
+```typescript middleware.ts
+export { default } from "next-auth/middleware"
+
+export const config = {
+  matcher: ["/dashboard"],
+}
+```
+
+If you try to access `/dashboard` without being authenticated, you'll be automatically redirected to the sign-in page.
+
+## Verification
+
+To verify your installation is working correctly:
+
+<AccordionGroup>
+  <Accordion title="Check the login page">
+    Visit `http://localhost:3000` and confirm you see the login form with email and password fields.
+  </Accordion>
+  
+  <Accordion title="Test authentication">
+    Try logging in with invalid credentials - you should see an error message. Then try with valid credentials - you should be redirected to the dashboard.
+  </Accordion>
+  
+  <Accordion title="Check database connection">
+    Run `npx prisma studio` to open Prisma Studio and verify your database schema is correct and data is present.
+  </Accordion>
+  
+  <Accordion title="Verify session management">
+    After logging in, open browser DevTools → Application → Cookies and check for the NextAuth session token.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion icon="database" title="Database connection errors">
+    If you see database connection errors:
+    
+    - Verify PostgreSQL is running: `pg_isready`
+    - Check your `DATABASE_URL` format and credentials
+    - Ensure the database exists: `psql -l | grep gaotev`
+    - Try connecting manually: `psql postgresql://user:password@localhost:5432/gaotev`
+  </Accordion>
+  
+  <Accordion icon="key" title="NextAuth errors">
+    If authentication isn't working:
+    
+    - Verify `NEXTAUTH_SECRET` is set in `.env`
+    - Check `NEXTAUTH_URL` matches your development URL
+    - Clear browser cookies and try again
+    - Check browser console for JavaScript errors
+  </Accordion>
+  
+  <Accordion icon="circle-exclamation" title="Port already in use">
+    If port 3000 is already in use:
+    
+    ```bash
+    # Find process using port 3000
+    lsof -ti:3000
+    
+    # Kill the process (macOS/Linux)
+    kill -9 $(lsof -ti:3000)
+    
+    # Or use a different port
+    PORT=3001 npm run dev
+    ```
+  </Accordion>
+  
+  <Accordion icon="cube" title="Prisma Client errors">
+    If you see Prisma Client errors:
+    
+    - Regenerate the client: `npx prisma generate`
+    - Run migrations again: `npx prisma migrate dev`
+    - Reset the database if needed: `npx prisma migrate reset`
+  </Accordion>
+</AccordionGroup>
+
+## Available Scripts
+
+Here are the npm scripts defined in `package.json`:
+
+```json
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  }
+}
+```
+
+- **`npm run dev`** - Start development server with hot reload
+- **`npm run build`** - Create optimized production build
+- **`npm run start`** - Start production server (requires `npm run build` first)
+- **`npm run lint`** - Run ESLint to check code quality
+
+## Next Steps
+
+Now that you have GAOTEV running locally, explore these topics:
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="lock" href="/features/authentication">
+    Learn how NextAuth.js credentials provider works
+  </Card>
+  <Card title="Dashboard" icon="gauge" href="/features/dashboard">
+    Explore the protected dashboard implementation
+  </Card>
+  <Card title="Database" icon="database" href="/features/database">
+    Understand the Prisma schema and queries
+  </Card>
+  <Card title="Configuration" icon="gear" href="/development/configuration">
+    Deep dive into environment and app configuration
+  </Card>
+</CardGroup>

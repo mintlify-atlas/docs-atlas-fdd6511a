@@ -1,0 +1,234 @@
+---
+title: 'Authentication'
+description: 'NextAuth.js authentication system with credentials provider and JWT sessions'
+---
+
+## Overview
+
+GAOTEV implements a secure authentication system using **NextAuth.js v4** with the Credentials provider. The system uses JWT sessions for stateless authentication and bcrypt for password hashing.
+
+<Info>
+The authentication system is configured to work with PostgreSQL via Prisma ORM for user credential verification.
+</Info>
+
+## NextAuth.js Configuration
+
+The authentication handler is located at `app/api/auth/[...nextauth]/route.ts` and exports both GET and POST handlers:
+
+```typescript app/api/auth/[...nextauth]/route.ts
+import NextAuth from "next-auth"
+import CredentialsProvider from "next-auth/providers/credentials"
+import { PrismaClient } from "@prisma/client"
+import bcrypt from "bcrypt"
+
+const prisma = new PrismaClient()
+
+const handler = NextAuth({
+  providers: [
+    CredentialsProvider({
+      name: "Credentials",
+      credentials: {
+        email: { label: "Email", type: "text" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          return null
+        }
+
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email },
+        })
+
+        if (!user) return null
+
+        const isValid = await bcrypt.compare(
+          credentials.password,
+          user.password
+        )
+
+        if (!isValid) return null
+
+        return {
+          id: user.id,
+          email: user.email,
+        }
+      },
+    }),
+  ],
+  session: {
+    strategy: "jwt",
+  },
+  secret: process.env.NEXTAUTH_SECRET,
+})
+
+export { handler as GET, handler as POST }
+```
+
+## Authentication Flow
+
+<Steps>
+  <Step title="User Submits Credentials">
+    The user submits their email and password through the login form.
+  </Step>
+  <Step title="Credential Validation">
+    NextAuth.js calls the `authorize` function with the provided credentials.
+  </Step>
+  <Step title="Database Lookup">
+    Prisma queries the database to find a user with the matching email.
+  </Step>
+  <Step title="Password Verification">
+    Bcrypt compares the submitted password with the hashed password stored in the database.
+  </Step>
+  <Step title="Session Creation">
+    If valid, NextAuth.js creates a JWT session token and returns the user object.
+  </Step>
+</Steps>
+
+## Credentials Provider
+
+The system uses NextAuth.js's **CredentialsProvider** for email/password authentication:
+
+<CardGroup cols={2}>
+  <Card title="Email Field" icon="envelope">
+    Text input for user email address
+  </Card>
+  <Card title="Password Field" icon="lock">
+    Password input with secure masking
+  </Card>
+</CardGroup>
+
+### Authorization Logic
+
+The `authorize` function implements the following checks:
+
+1. **Null Check**: Ensures both email and password are provided
+2. **User Lookup**: Queries database for user by email using `prisma.user.findUnique()`
+3. **Password Comparison**: Uses `bcrypt.compare()` to verify password against stored hash
+4. **Return User**: Returns user object with `id` and `email` if authentication succeeds
+
+<Warning>
+The function returns `null` if any validation step fails, preventing unauthorized access.
+</Warning>
+
+## JWT Session Strategy
+
+GAOTEV uses **JWT (JSON Web Token)** sessions for stateless authentication:
+
+```typescript
+session: {
+  strategy: "jwt",
+}
+```
+
+### Benefits of JWT Sessions
+
+<AccordionGroup>
+  <Accordion title="Stateless Architecture">
+    No server-side session storage required. Session data is encoded in the token itself.
+  </Accordion>
+  <Accordion title="Scalability">
+    Works seamlessly across multiple server instances without session synchronization.
+  </Accordion>
+  <Accordion title="Performance">
+    Eliminates database queries for session validation on every request.
+  </Accordion>
+</AccordionGroup>
+
+## Password Security
+
+Passwords are hashed using **bcrypt** before storage:
+
+```typescript
+const isValid = await bcrypt.compare(
+  credentials.password,
+  user.password
+)
+```
+
+<Tip>
+Bcrypt is a password-hashing function designed to be computationally expensive, making brute-force attacks impractical.
+</Tip>
+
+### Password Hashing Flow
+
+- **Registration**: User passwords are hashed with bcrypt before being stored in the database
+- **Login**: Plain-text password is compared against stored hash using `bcrypt.compare()`
+- **Verification**: Returns boolean indicating whether passwords match
+
+<Note>
+Passwords are never stored in plain text. Only the bcrypt hash is persisted to the database.
+</Note>
+
+## Environment Variables
+
+The authentication system requires the following environment variable:
+
+```bash .env
+NEXTAUTH_SECRET=your-secret-key-here
+```
+
+<Warning>
+The `NEXTAUTH_SECRET` is used to encrypt JWT tokens. Use a strong, randomly generated secret in production.
+</Warning>
+
+## Client-Side Authentication
+
+The login page implements client-side authentication using NextAuth's `signIn` function:
+
+```jsx app/login/page.jsx
+const handleSubmit = async (e) => {
+  e.preventDefault()
+  setError("")
+
+  const result = await signIn("credentials", {
+    email,
+    password,
+    redirect: false,
+  })
+
+  if (result?.ok) {
+    router.push("/dashboard")
+  } else {
+    setError("Credenciales incorrectas")
+  }
+}
+```
+
+### Key Parameters
+
+- `"credentials"`: Specifies the Credentials provider
+- `redirect: false`: Prevents automatic redirection, allowing manual error handling
+- `router.push("/dashboard")`: Programmatic navigation on successful login
+
+<Info>
+Setting `redirect: false` allows you to handle authentication errors gracefully and display custom error messages.
+</Info>
+
+## Security Considerations
+
+<CardGroup cols={2}>
+  <Card title="Password Hashing" icon="shield">
+    Bcrypt with salt rounds ensures passwords are securely hashed
+  </Card>
+  <Card title="JWT Tokens" icon="key">
+    Signed with NEXTAUTH_SECRET to prevent tampering
+  </Card>
+  <Card title="HTTPS Required" icon="lock">
+    Always use HTTPS in production to protect credentials in transit
+  </Card>
+  <Card title="Token Expiry" icon="clock">
+    JWT tokens expire automatically, requiring re-authentication
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Dashboard" href="/features/dashboard" icon="grid">
+    Learn how protected routes work
+  </Card>
+  <Card title="Database" href="/features/database" icon="database">
+    Explore the Prisma schema and User model
+  </Card>
+</CardGroup>

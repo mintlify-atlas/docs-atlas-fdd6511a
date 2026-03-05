@@ -1,0 +1,433 @@
+---
+title: 'Database'
+description: 'Prisma ORM configuration with PostgreSQL and type-safe database queries'
+---
+
+## Overview
+
+GAOTEV uses **Prisma** as its Object-Relational Mapping (ORM) tool to interact with a **PostgreSQL** database. Prisma provides type-safe database queries, automatic migrations, and a clean API for data access.
+
+<Info>
+Prisma Client is auto-generated based on your schema, providing full TypeScript type safety for all database operations.
+</Info>
+
+## Prisma Schema
+
+The database schema is defined in `prisma/schema.prisma`:
+
+```prisma prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+}
+```
+
+## Schema Components
+
+### Generator Configuration
+
+The generator block specifies how Prisma Client should be generated:
+
+```prisma
+generator client {
+  provider = "prisma-client-js"
+}
+```
+
+<CardGroup cols={2}>
+  <Card title="prisma-client-js" icon="js">
+    Generates the JavaScript/TypeScript Prisma Client library
+  </Card>
+  <Card title="Auto-Generation" icon="wand-magic-sparkles">
+    Client is regenerated when schema changes
+  </Card>
+</CardGroup>
+
+### Datasource Configuration
+
+The datasource block defines the database connection:
+
+```prisma
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+```
+
+<AccordionGroup>
+  <Accordion title="provider">
+    Specifies PostgreSQL as the database engine. Prisma also supports MySQL, SQLite, SQL Server, and MongoDB.
+  </Accordion>
+  <Accordion title="url">
+    Connection string for database queries. Uses the `DATABASE_URL` environment variable.
+  </Accordion>
+  <Accordion title="directUrl">
+    Direct connection to the database, bypassing connection poolers. Required for migrations in some hosting environments.
+  </Accordion>
+</AccordionGroup>
+
+<Tip>
+The `directUrl` is particularly important when using services like Neon or Supabase with connection pooling.
+</Tip>
+
+## User Model
+
+The `User` model defines the structure of the users table:
+
+```prisma
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+}
+```
+
+### Field Definitions
+
+<CardGroup cols={2}>
+  <Card title="id" icon="fingerprint">
+    **Type**: String  
+    **Attributes**: Primary key, auto-generated CUID
+  </Card>
+  <Card title="email" icon="envelope">
+    **Type**: String  
+    **Attributes**: Unique constraint for authentication
+  </Card>
+  <Card title="password" icon="lock">
+    **Type**: String  
+    **Stores**: Bcrypt-hashed password
+  </Card>
+  <Card title="createdAt" icon="calendar">
+    **Type**: DateTime  
+    **Default**: Timestamp of record creation
+  </Card>
+</CardGroup>
+
+### Field Attributes
+
+<AccordionGroup>
+  <Accordion title="@id">
+    Designates the field as the primary key. Every model must have exactly one primary key.
+  </Accordion>
+  <Accordion title="@default(cuid())">
+    Automatically generates a CUID (Collision-resistant Unique Identifier) when a new user is created.
+  </Accordion>
+  <Accordion title="@unique">
+    Ensures no two users can have the same email address. Creates a unique index in the database.
+  </Accordion>
+  <Accordion title="@default(now())">
+    Automatically sets the field to the current timestamp when the record is created.
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+Passwords should always be hashed before storing. GAOTEV uses bcrypt for password hashing before persisting to the database.
+</Warning>
+
+## Prisma Configuration File
+
+The `prisma.config.ts` file provides additional configuration:
+
+```typescript prisma.config.ts
+import "dotenv/config";
+import { defineConfig } from "prisma/config";
+
+export default defineConfig({
+  schema: "prisma/schema.prisma",
+  migrations: {
+    path: "prisma/migrations",
+  },
+  datasource: {
+    url: process.env["DATABASE_URL"],
+    directUrl: process.env["DIRECT_URL"],
+  },
+});
+```
+
+### Configuration Options
+
+<CardGroup cols={3}>
+  <Card title="schema" icon="file">
+    Path to the Prisma schema file
+  </Card>
+  <Card title="migrations" icon="code-branch">
+    Directory where migration files are stored
+  </Card>
+  <Card title="datasource" icon="database">
+    Database connection configuration
+  </Card>
+</CardGroup>
+
+<Note>
+The `dotenv/config` import loads environment variables from `.env` files automatically.
+</Note>
+
+## Database Connection
+
+### Prisma Client Initialization
+
+Prisma Client is instantiated in the NextAuth configuration:
+
+```typescript app/api/auth/[...nextauth]/route.ts
+import { PrismaClient } from "@prisma/client"
+
+const prisma = new PrismaClient()
+```
+
+<Info>
+Prisma Client maintains a connection pool to efficiently handle database queries.
+</Info>
+
+### Best Practices for Prisma Client
+
+<AccordionGroup>
+  <Accordion title="Singleton Pattern in Development">
+    In development with hot reloading, use a singleton pattern to prevent multiple Prisma Client instances:
+    ```typescript
+    const globalForPrisma = global as unknown as { prisma: PrismaClient }
+    export const prisma = globalForPrisma.prisma || new PrismaClient()
+    if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+    ```
+  </Accordion>
+  <Accordion title="Connection Pooling">
+    Prisma automatically manages connection pooling. Configure pool size via the `connection_limit` parameter in your DATABASE_URL.
+  </Accordion>
+  <Accordion title="Disconnect on Shutdown">
+    For serverless environments, Prisma automatically manages connections. For long-running processes, disconnect when shutting down:
+    ```typescript
+    await prisma.$disconnect()
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Type-Safe Queries
+
+Prisma provides full TypeScript type safety for all database operations.
+
+### Finding a User
+
+Example from the authentication route:
+
+```typescript
+const user = await prisma.user.findUnique({
+  where: { email: credentials.email },
+})
+```
+
+<Tip>
+Prisma Client autocompletes model names, fields, and query options in your IDE, preventing typos and invalid queries.
+</Tip>
+
+### Common Query Operations
+
+<AccordionGroup>
+  <Accordion title="findUnique">
+    Finds a single record by a unique field (id or email):
+    ```typescript
+    const user = await prisma.user.findUnique({
+      where: { id: "user_id" }
+    })
+    ```
+  </Accordion>
+  <Accordion title="findMany">
+    Retrieves multiple records with optional filtering:
+    ```typescript
+    const users = await prisma.user.findMany({
+      where: { createdAt: { gte: new Date('2026-01-01') } },
+      orderBy: { createdAt: 'desc' }
+    })
+    ```
+  </Accordion>
+  <Accordion title="create">
+    Creates a new record:
+    ```typescript
+    const user = await prisma.user.create({
+      data: {
+        email: "user@example.com",
+        password: hashedPassword
+      }
+    })
+    ```
+  </Accordion>
+  <Accordion title="update">
+    Updates an existing record:
+    ```typescript
+    const user = await prisma.user.update({
+      where: { id: "user_id" },
+      data: { email: "newemail@example.com" }
+    })
+    ```
+  </Accordion>
+  <Accordion title="delete">
+    Deletes a record:
+    ```typescript
+    await prisma.user.delete({
+      where: { id: "user_id" }
+    })
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Migration Workflow
+
+Prisma Migrate manages database schema changes through migration files.
+
+### Creating a Migration
+
+When you modify the Prisma schema, create a migration:
+
+```bash
+npx prisma migrate dev --name add_user_model
+```
+
+<Steps>
+  <Step title="Schema Analysis">
+    Prisma compares your schema with the current database state.
+  </Step>
+  <Step title="Generate SQL">
+    Creates SQL migration files in `prisma/migrations/`.
+  </Step>
+  <Step title="Apply Migration">
+    Executes the SQL against your database.
+  </Step>
+  <Step title="Generate Client">
+    Regenerates Prisma Client with updated types.
+  </Step>
+</Steps>
+
+### Migration Commands
+
+<CardGroup cols={2}>
+  <Card title="migrate dev" icon="code">
+    Creates and applies migrations in development
+  </Card>
+  <Card title="migrate deploy" icon="rocket">
+    Applies pending migrations in production
+  </Card>
+  <Card title="migrate reset" icon="rotate-left">
+    Resets database and reapplies all migrations
+  </Card>
+  <Card title="db push" icon="upload">
+    Pushes schema changes without creating migrations (prototyping)
+  </Card>
+</CardGroup>
+
+<Warning>
+Never edit migration files manually after they've been applied. Always create a new migration for schema changes.
+</Warning>
+
+### Production Deployments
+
+For production, use `prisma migrate deploy`:
+
+```bash
+npx prisma migrate deploy
+```
+
+<Info>
+This command only applies pending migrations and does not generate new ones, making it safe for production deployments.
+</Info>
+
+## Environment Variables
+
+The database configuration requires the following environment variables:
+
+```bash .env
+DATABASE_URL="postgresql://user:password@host:5432/database?pgbouncer=true"
+DIRECT_URL="postgresql://user:password@host:5432/database"
+```
+
+### Connection String Format
+
+<AccordionGroup>
+  <Accordion title="DATABASE_URL">
+    Used for application queries. Can point to a connection pooler like PgBouncer for better performance.
+  </Accordion>
+  <Accordion title="DIRECT_URL">
+    Direct database connection for migrations and schema operations. Required when using connection poolers.
+  </Accordion>
+</AccordionGroup>
+
+<Tip>
+For local development, both URLs can point to the same PostgreSQL instance.
+</Tip>
+
+## Prisma Studio
+
+Prisma Studio provides a visual database browser:
+
+```bash
+npx prisma studio
+```
+
+This opens a web interface where you can:
+
+<CardGroup cols={2}>
+  <Card title="Browse Data" icon="table">
+    View and filter records in all tables
+  </Card>
+  <Card title="Edit Records" icon="pen">
+    Create, update, and delete records directly
+  </Card>
+  <Card title="Test Queries" icon="magnifying-glass">
+    Experiment with data before writing code
+  </Card>
+  <Card title="Inspect Schema" icon="diagram-project">
+    Visualize model relationships
+  </Card>
+</CardGroup>
+
+<Note>
+Prisma Studio runs on `http://localhost:5555` by default.
+</Note>
+
+## Schema Validation
+
+Validate your Prisma schema without applying changes:
+
+```bash
+npx prisma validate
+```
+
+This checks for:
+- Syntax errors
+- Invalid field types
+- Missing relations
+- Unsupported database features
+
+## Generating Prisma Client
+
+Regenerate Prisma Client after schema changes:
+
+```bash
+npx prisma generate
+```
+
+<Info>
+This is automatically run after `prisma migrate dev`, but you may need to run it manually in some CI/CD pipelines.
+</Info>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" href="/features/authentication" icon="lock">
+    See how Prisma is used for user authentication
+  </Card>
+  <Card title="Dashboard" href="/features/dashboard" icon="grid">
+    Explore the protected dashboard implementation
+  </Card>
+</CardGroup>

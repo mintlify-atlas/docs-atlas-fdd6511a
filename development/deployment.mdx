@@ -1,0 +1,787 @@
+---
+title: 'Deployment'
+description: 'Deploy GAOTEV to production environments'
+---
+
+## Production Build Process
+
+Before deploying, you need to create an optimized production build.
+
+### Building for Production
+
+<Steps>
+  <Step title="Install Dependencies">
+    Ensure all dependencies are installed:
+    ```bash
+    npm install --production=false
+    ```
+  </Step>
+  
+  <Step title="Run Database Migrations">
+    Apply database migrations before building:
+    ```bash
+    npx prisma migrate deploy
+    ```
+    <Warning>
+      Use `migrate deploy` (not `migrate dev`) in production. This applies pending migrations without prompting.
+    </Warning>
+  </Step>
+  
+  <Step title="Generate Prisma Client">
+    Generate the Prisma Client:
+    ```bash
+    npx prisma generate
+    ```
+  </Step>
+  
+  <Step title="Build the Application">
+    Create the production build:
+    ```bash
+    npm run build
+    ```
+    
+    This command:
+    - Compiles TypeScript files
+    - Optimizes React components
+    - Generates static assets
+    - Creates production-ready bundles in `.next/` directory
+  </Step>
+</Steps>
+
+### Build Output
+
+The build process creates several directories:
+
+```
+.next/
+├── cache/              # Build cache
+├── server/             # Server-side code
+├── static/             # Static assets
+└── standalone/         # Standalone output (if configured)
+```
+
+<Tip>
+  For Docker deployments, enable standalone output in `next.config.ts`:
+  ```typescript
+  const nextConfig: NextConfig = {
+    output: 'standalone',
+  };
+  ```
+  This includes only necessary files and dependencies.
+</Tip>
+
+## Environment Setup for Production
+
+### Required Environment Variables
+
+Set these environment variables in your production environment:
+
+```bash
+# Database Configuration
+DATABASE_URL="postgresql://user:password@host:5432/database?sslmode=require"
+DIRECT_URL="postgresql://user:password@host:5432/database?sslmode=require"
+
+# Authentication
+NEXTAUTH_SECRET="your-production-secret-min-32-characters"
+NEXTAUTH_URL="https://your-domain.com"
+
+# Node Environment
+NODE_ENV="production"
+```
+
+<Warning>
+  **Production Security Requirements**:
+  - Use SSL/TLS for database connections (`sslmode=require`)
+  - Generate a strong, unique `NEXTAUTH_SECRET` (not the development secret)
+  - Use HTTPS for `NEXTAUTH_URL`
+  - Never expose environment variables in client-side code
+</Warning>
+
+### Database Connection
+
+<Note>
+  **Connection Pooling**:
+  
+  In production, use connection pooling to handle concurrent requests efficiently:
+  
+  - **With PgBouncer**: Set `DATABASE_URL` to the pooler and `DIRECT_URL` to the direct connection
+  - **With Supabase**: Use the pooler connection for `DATABASE_URL` and direct connection for `DIRECT_URL`
+  - **Without pooler**: Both URLs can be the same direct connection
+</Note>
+
+**Example with Supabase**:
+```bash
+DATABASE_URL="postgresql://postgres:[password]@db.[project].supabase.co:6543/postgres?pgbouncer=true"
+DIRECT_URL="postgresql://postgres:[password]@db.[project].supabase.co:5432/postgres"
+```
+
+**Example with Railway**:
+```bash
+DATABASE_URL="postgresql://postgres:[password]@containers-us-west-123.railway.app:7654/railway?sslmode=require"
+DIRECT_URL="postgresql://postgres:[password]@containers-us-west-123.railway.app:7654/railway?sslmode=require"
+```
+
+## Database Migration Strategy
+
+### Development vs Production Migrations
+
+<CodeGroup>
+```bash Development
+# Creates migration and applies it
+npx prisma migrate dev --name migration_name
+
+# Generates Prisma Client
+npx prisma generate
+```
+
+```bash Production
+# Apply pending migrations (non-interactive)
+npx prisma migrate deploy
+
+# Generate Prisma Client
+npx prisma generate
+```
+</CodeGroup>
+
+### Migration Workflow
+
+<Steps>
+  <Step title="Create Migration in Development">
+    Develop and test schema changes locally:
+    ```bash
+    npx prisma migrate dev --name add_user_profile
+    ```
+    
+    This creates a migration file in `prisma/migrations/`:
+    ```
+    prisma/migrations/
+    └── 20260305120000_add_user_profile/
+        └── migration.sql
+    ```
+  </Step>
+  
+  <Step title="Test Migration">
+    Verify the migration works:
+    - Test in development environment
+    - Run application and verify functionality
+    - Check for data integrity issues
+  </Step>
+  
+  <Step title="Commit Migration Files">
+    Commit the migration files to version control:
+    ```bash
+    git add prisma/migrations/
+    git commit -m "Add user profile migration"
+    git push
+    ```
+  </Step>
+  
+  <Step title="Deploy to Production">
+    Deploy the updated code and run migrations:
+    ```bash
+    # Pull latest code
+    git pull origin main
+    
+    # Apply migrations
+    npx prisma migrate deploy
+    
+    # Generate client
+    npx prisma generate
+    
+    # Rebuild and restart
+    npm run build
+    npm run start
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+  **Migration Best Practices**:
+  - Always test migrations in staging before production
+  - Back up your database before applying migrations
+  - For large tables, consider zero-downtime migrations
+  - Monitor migration execution time
+  - Have a rollback plan
+</Warning>
+
+### Handling Migration Failures
+
+If a migration fails in production:
+
+```bash
+# Check migration status
+npx prisma migrate status
+
+# If migration is partially applied, mark it as rolled back
+npx prisma migrate resolve --rolled-back [migration_name]
+
+# Fix the migration SQL and try again
+npx prisma migrate deploy
+```
+
+## Deployment Options
+
+### Option 1: Vercel (Recommended)
+
+Vercel is the easiest deployment option for Next.js applications.
+
+<Steps>
+  <Step title="Install Vercel CLI">
+    ```bash
+    npm install -g vercel
+    ```
+  </Step>
+  
+  <Step title="Login to Vercel">
+    ```bash
+    vercel login
+    ```
+  </Step>
+  
+  <Step title="Deploy">
+    From your project directory:
+    ```bash
+    vercel
+    ```
+    
+    For production:
+    ```bash
+    vercel --prod
+    ```
+  </Step>
+  
+  <Step title="Configure Environment Variables">
+    Add environment variables in Vercel dashboard:
+    - Go to Project Settings → Environment Variables
+    - Add `DATABASE_URL`, `DIRECT_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`
+    - Select production/preview/development environments
+  </Step>
+</Steps>
+
+<Accordion title="Vercel Project Configuration">
+```json vercel.json
+{
+  "buildCommand": "prisma generate && next build",
+  "devCommand": "next dev",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "regions": ["iad1"],
+  "env": {
+    "DATABASE_URL": "@database-url",
+    "DIRECT_URL": "@direct-url",
+    "NEXTAUTH_SECRET": "@nextauth-secret",
+    "NEXTAUTH_URL": "@nextauth-url"
+  }
+}
+```
+</Accordion>
+
+<Note>
+  **Vercel Benefits**:
+  - Automatic deployments from Git
+  - Preview deployments for pull requests
+  - Edge network for global performance
+  - Automatic HTTPS
+  - Zero-config Next.js optimization
+  - Built-in analytics
+</Note>
+
+### Option 2: Docker Deployment
+
+Deploy using Docker for more control and flexibility.
+
+<Steps>
+  <Step title="Create Dockerfile">
+    ```dockerfile Dockerfile
+    FROM node:20-alpine AS base
+    
+    # Install dependencies only when needed
+    FROM base AS deps
+    RUN apk add --no-cache libc6-compat
+    WORKDIR /app
+    
+    COPY package.json package-lock.json ./
+    RUN npm ci
+    
+    # Rebuild the source code only when needed
+    FROM base AS builder
+    WORKDIR /app
+    COPY --from=deps /app/node_modules ./node_modules
+    COPY . .
+    
+    # Generate Prisma Client
+    RUN npx prisma generate
+    
+    # Build Next.js
+    RUN npm run build
+    
+    # Production image
+    FROM base AS runner
+    WORKDIR /app
+    
+    ENV NODE_ENV production
+    
+    RUN addgroup --system --gid 1001 nodejs
+    RUN adduser --system --uid 1001 nextjs
+    
+    COPY --from=builder /app/public ./public
+    COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+    COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+    COPY --from=builder /app/prisma ./prisma
+    COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+    
+    USER nextjs
+    
+    EXPOSE 3000
+    
+    ENV PORT 3000
+    ENV HOSTNAME "0.0.0.0"
+    
+    CMD ["node", "server.js"]
+    ```
+  </Step>
+  
+  <Step title="Create .dockerignore">
+    ```plaintext .dockerignore
+    node_modules
+    .next
+    .git
+    .gitignore
+    .env
+    .env.local
+    README.md
+    ```
+  </Step>
+  
+  <Step title="Build Docker Image">
+    ```bash
+    docker build -t gaotev:latest .
+    ```
+  </Step>
+  
+  <Step title="Run Container">
+    ```bash
+    docker run -p 3000:3000 \
+      -e DATABASE_URL="your-db-url" \
+      -e DIRECT_URL="your-direct-url" \
+      -e NEXTAUTH_SECRET="your-secret" \
+      -e NEXTAUTH_URL="https://your-domain.com" \
+      gaotev:latest
+    ```
+  </Step>
+</Steps>
+
+<Accordion title="Docker Compose Configuration">
+```yaml docker-compose.yml
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - DIRECT_URL=${DIRECT_URL}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - NODE_ENV=production
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=gaotev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+```
+
+Run with:
+```bash
+docker-compose up -d
+```
+</Accordion>
+
+### Option 3: VPS Deployment (DigitalOcean, AWS EC2, etc.)
+
+Deploy on a Virtual Private Server for full control.
+
+<Steps>
+  <Step title="Connect to Server">
+    ```bash
+    ssh user@your-server-ip
+    ```
+  </Step>
+  
+  <Step title="Install Dependencies">
+    ```bash
+    # Install Node.js 20
+    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+    sudo apt-get install -y nodejs
+    
+    # Install PostgreSQL
+    sudo apt-get install postgresql postgresql-contrib
+    
+    # Install PM2 for process management
+    sudo npm install -g pm2
+    ```
+  </Step>
+  
+  <Step title="Clone Repository">
+    ```bash
+    git clone <your-repo-url>
+    cd sistema-gestion
+    ```
+  </Step>
+  
+  <Step title="Configure Environment">
+    ```bash
+    # Create .env file
+    nano .env
+    
+    # Add production environment variables
+    # Save and exit
+    ```
+  </Step>
+  
+  <Step title="Build and Start">
+    ```bash
+    # Install dependencies
+    npm install
+    
+    # Run migrations
+    npx prisma migrate deploy
+    
+    # Generate Prisma Client
+    npx prisma generate
+    
+    # Build application
+    npm run build
+    
+    # Start with PM2
+    pm2 start npm --name "gaotev" -- start
+    pm2 save
+    pm2 startup
+    ```
+  </Step>
+  
+  <Step title="Configure Nginx (Optional)">
+    ```nginx /etc/nginx/sites-available/gaotev
+    server {
+        listen 80;
+        server_name your-domain.com;
+        
+        location / {
+            proxy_pass http://localhost:3000;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection 'upgrade';
+            proxy_set_header Host $host;
+            proxy_cache_bypass $http_upgrade;
+        }
+    }
+    ```
+    
+    Enable site:
+    ```bash
+    sudo ln -s /etc/nginx/sites-available/gaotev /etc/nginx/sites-enabled/
+    sudo nginx -t
+    sudo systemctl restart nginx
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+  **PM2 Useful Commands**:
+  ```bash
+  pm2 list              # List all processes
+  pm2 logs gaotev       # View logs
+  pm2 restart gaotev    # Restart app
+  pm2 stop gaotev       # Stop app
+  pm2 delete gaotev     # Remove from PM2
+  pm2 monit            # Monitor resources
+  ```
+</Tip>
+
+## Environment Variable Management
+
+### Secure Storage Solutions
+
+<Accordion title="Vercel">
+  Use Vercel's built-in environment variable management:
+  - Project Settings → Environment Variables
+  - Supports Production, Preview, and Development environments
+  - Can reference across projects
+  - Automatic encryption
+</Accordion>
+
+<Accordion title="AWS Secrets Manager">
+  ```bash
+  # Store secret
+  aws secretsmanager create-secret \
+    --name gaotev/production \
+    --secret-string '{"DATABASE_URL":"...","NEXTAUTH_SECRET":"..."}'
+  
+  # Retrieve in application
+  const secret = await secretsManager.getSecretValue({
+    SecretId: 'gaotev/production'
+  }).promise();
+  ```
+</Accordion>
+
+<Accordion title="Docker Secrets">
+  ```yaml docker-compose.yml
+  version: '3.8'
+  
+  services:
+    app:
+      image: gaotev:latest
+      secrets:
+        - db_password
+        - nextauth_secret
+  
+  secrets:
+    db_password:
+      file: ./secrets/db_password.txt
+    nextauth_secret:
+      file: ./secrets/nextauth_secret.txt
+  ```
+</Accordion>
+
+<Accordion title="Environment Files">
+  Use `.env.production` (never commit):
+  ```bash
+  # Load production env
+  export $(cat .env.production | xargs)
+  npm run build
+  npm run start
+  ```
+</Accordion>
+
+## Best Practices
+
+### Performance Optimization
+
+<Note>
+  **Production Optimizations**:
+  - Enable gzip/brotli compression
+  - Use CDN for static assets
+  - Implement caching strategies
+  - Optimize images with Next.js Image component
+  - Use database connection pooling
+  - Enable Next.js incremental static regeneration (ISR) where applicable
+</Note>
+
+### Monitoring and Logging
+
+<Steps>
+  <Step title="Application Monitoring">
+    Use tools like:
+    - Vercel Analytics (built-in)
+    - Sentry for error tracking
+    - LogRocket for session replay
+    - New Relic for APM
+  </Step>
+  
+  <Step title="Database Monitoring">
+    Monitor database performance:
+    - Prisma Query Analytics
+    - PostgreSQL pg_stat_statements
+    - Database provider's monitoring tools
+  </Step>
+  
+  <Step title="Infrastructure Monitoring">
+    Track server health:
+    - CPU, memory, disk usage
+    - Response times
+    - Error rates
+    - Uptime monitoring (Uptime Robot, Pingdom)
+  </Step>
+</Steps>
+
+### Security Checklist
+
+<Warning>
+  **Pre-Deployment Security Review**:
+  - ✅ All environment variables are set correctly
+  - ✅ Database uses SSL/TLS connections
+  - ✅ Strong `NEXTAUTH_SECRET` is configured
+  - ✅ HTTPS is enforced
+  - ✅ CORS is properly configured
+  - ✅ Rate limiting is implemented
+  - ✅ SQL injection prevention (Prisma handles this)
+  - ✅ XSS protection enabled
+  - ✅ CSRF protection enabled (NextAuth handles this)
+  - ✅ Security headers configured
+</Warning>
+
+### Backup Strategy
+
+<Steps>
+  <Step title="Database Backups">
+    Implement automated backups:
+    ```bash
+    # PostgreSQL backup
+    pg_dump -h localhost -U postgres -d gaotev > backup_$(date +%Y%m%d).sql
+    
+    # Restore
+    psql -h localhost -U postgres -d gaotev < backup_20260305.sql
+    ```
+  </Step>
+  
+  <Step title="Automated Backup Script">
+    ```bash backup.sh
+    #!/bin/bash
+    BACKUP_DIR="/backups"
+    DATE=$(date +%Y%m%d_%H%M%S)
+    
+    # Database backup
+    pg_dump $DATABASE_URL > "$BACKUP_DIR/db_$DATE.sql"
+    
+    # Upload to S3
+    aws s3 cp "$BACKUP_DIR/db_$DATE.sql" s3://your-bucket/backups/
+    
+    # Keep only last 7 days
+    find $BACKUP_DIR -name "db_*.sql" -mtime +7 -delete
+    ```
+    
+    Add to cron:
+    ```bash
+    0 2 * * * /path/to/backup.sh
+    ```
+  </Step>
+</Steps>
+
+### Scaling Considerations
+
+<Accordion title="Horizontal Scaling">
+  - Deploy multiple instances behind a load balancer
+  - Use stateless architecture (JWT sessions)
+  - Implement Redis for shared session storage if needed
+  - Use database connection pooling
+</Accordion>
+
+<Accordion title="Database Scaling">
+  - Use read replicas for read-heavy workloads
+  - Implement caching layer (Redis, Memcached)
+  - Optimize queries and add indexes
+  - Consider database sharding for large datasets
+</Accordion>
+
+<Accordion title="CDN and Caching">
+  - Use Vercel Edge Network or CloudFlare CDN
+  - Cache static assets aggressively
+  - Implement API response caching
+  - Use ISR for semi-static pages
+</Accordion>
+
+## Continuous Deployment
+
+### GitHub Actions Workflow
+
+```yaml .github/workflows/deploy.yml
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Generate Prisma Client
+        run: npx prisma generate
+      
+      - name: Run tests
+        run: npm test
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      
+      - name: Build
+        run: npm run build
+      
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+```
+
+## Troubleshooting
+
+<Accordion title="Build Failures">
+  **Issue**: Build fails with Prisma errors
+  
+  **Solutions**:
+  - Ensure `prisma generate` runs before `next build`
+  - Check `DATABASE_URL` is set during build (if needed)
+  - Verify Prisma schema syntax
+  - Clear `.next` cache: `rm -rf .next`
+</Accordion>
+
+<Accordion title="Database Connection Issues">
+  **Issue**: Cannot connect to database in production
+  
+  **Solutions**:
+  - Verify connection string format
+  - Check SSL mode is set (`sslmode=require`)
+  - Ensure database allows connections from your server IP
+  - Test connection: `npx prisma db pull`
+  - Check firewall rules
+</Accordion>
+
+<Accordion title="Authentication Not Working">
+  **Issue**: Users cannot log in after deployment
+  
+  **Solutions**:
+  - Verify `NEXTAUTH_URL` matches your domain
+  - Check `NEXTAUTH_SECRET` is set and matches between deployments
+  - Ensure cookies are sent over HTTPS only
+  - Check browser console for CORS errors
+</Accordion>
+
+<Accordion title="Performance Issues">
+  **Issue**: Slow page loads or API responses
+  
+  **Solutions**:
+  - Enable connection pooling
+  - Add database indexes
+  - Implement caching
+  - Use ISR for static content
+  - Profile with Next.js built-in analyzer
+  - Check database query performance with Prisma logs
+</Accordion>
+
+## Next Steps
+
+- Review [Configuration](/development/configuration) for environment setup
+- Check [Development Setup](/development/setup) for local development
+- Implement monitoring and alerting
+- Set up automated backups
+- Configure CI/CD pipeline
+- Plan scaling strategy based on traffic

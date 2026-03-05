@@ -1,97 +1,268 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: GAOTEV Documentation
+mode: custom
 ---
 
-## Setting up
+<div className="relative min-h-[500px] flex items-center justify-center py-20 bg-gradient-to-br from-[#1a1a1a] via-[#2a2a2a] to-[#1a1a1a] dark:from-[#0f1117] dark:via-[#1a1d27] dark:to-[#0f1117] overflow-hidden">
+  <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMzLjMxNCAwIDYgMi42ODYgNiA2cy0yLjY4NiA2LTYgNi02LTIuNjg2LTYtNiAyLjY4Ni02IDYtNnoiIHN0cm9rZT0iIzdlN2U3ZSIgc3Ryb2tlLW9wYWNpdHk9Ii4xIi8+PC9nPjwvc3ZnPg==')] opacity-20"></div>
+  
+  <div className="relative max-w-5xl mx-auto px-6 text-center">
+    <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold text-white mb-6 tracking-tight">
+      Welcome to GAOTEV
+    </h1>
+    
+    <p className="text-lg sm:text-xl text-gray-300 dark:text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed">
+      A modern Next.js management system with secure authentication, protected dashboard access, and seamless database integration.
+    </p>
+    
+    <div className="flex flex-wrap items-center justify-center gap-4">
+      <a 
+        href="/quickstart"
+        className="inline-flex items-center px-6 py-3 rounded-lg bg-[#7c7c7c] text-white font-medium hover:bg-[#6a6a6a] transition-colors"
+      >
+        Get Started
+        <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </a>
+      
+      <a 
+        href="/api/auth/overview"
+        className="inline-flex items-center px-6 py-3 rounded-lg border border-white/30 bg-white/10 text-white font-medium hover:bg-white/20 hover:border-white/40 transition-colors backdrop-blur-sm"
+      >
+        Explore API Reference
+      </a>
+    </div>
+  </div>
+</div>
 
-Get your documentation site up and running in minutes.
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="text-center mb-12">
+    <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-3">
+      Quick Start
+    </h2>
+    <p className="text-base text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+      Get up and running with GAOTEV in minutes
+    </p>
+  </div>
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+  <Steps>
+    <Step title="Clone the repository">
+      Clone the GAOTEV repository to your local machine:
+      
+      ```bash
+      git clone https://github.com/Gusivelin/GAOTEV.git
+      cd GAOTEV
+      ```
+    </Step>
+    
+    <Step title="Install dependencies">
+      Install the required npm packages:
+      
+      <CodeGroup>
+      ```bash npm
+      npm install
+      ```
+      
+      ```bash yarn
+      yarn install
+      ```
+      
+      ```bash pnpm
+      pnpm install
+      ```
+      </CodeGroup>
+    </Step>
+    
+    <Step title="Configure environment variables">
+      Create a `.env` file in the root directory with your database and authentication settings:
+      
+      ```bash .env
+      DATABASE_URL="postgresql://user:password@localhost:5432/gaotev"
+      DIRECT_URL="postgresql://user:password@localhost:5432/gaotev"
+      NEXTAUTH_SECRET="your-secret-key-here"
+      NEXTAUTH_URL="http://localhost:3000"
+      ```
+      
+      <Note>Generate a secure `NEXTAUTH_SECRET` using `openssl rand -base64 32`</Note>
+    </Step>
+    
+    <Step title="Run database migrations">
+      Set up your database schema using Prisma:
+      
+      ```bash
+      npx prisma migrate dev
+      ```
+      
+      This will create the necessary database tables based on the schema defined in `prisma/schema.prisma`.
+    </Step>
+    
+    <Step title="Start the development server">
+      Launch the application in development mode:
+      
+      ```bash
+      npm run dev
+      ```
+      
+      Open [http://localhost:3000](http://localhost:3000) in your browser to see the login page.
+    </Step>
+  </Steps>
+</div>
 
-## Make it yours
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="text-center mb-12">
+    <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-3">
+      Core Features
+    </h2>
+    <p className="text-base text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+      Everything you need to build a secure management system
+    </p>
+  </div>
 
-Design a docs site that looks great and empowers your users.
+  <CardGroup cols={2}>
+    <Card 
+      title="Authentication" 
+      icon="lock" 
+      href="/features/authentication"
+    >
+      Secure credential-based authentication powered by NextAuth.js with JWT session management.
+    </Card>
+    
+    <Card 
+      title="Protected Dashboard" 
+      icon="shield-halved" 
+      href="/features/dashboard"
+    >
+      Session-protected dashboard with automatic redirect for unauthenticated users.
+    </Card>
+    
+    <Card 
+      title="Database Integration" 
+      icon="database" 
+      href="/features/database"
+    >
+      Prisma ORM with PostgreSQL for type-safe database operations and migrations.
+    </Card>
+    
+    <Card 
+      title="Modern UI" 
+      icon="paintbrush" 
+      href="/development/setup"
+    >
+      Built with Next.js 16, TypeScript, Tailwind CSS, and Lucide icons for a polished interface.
+    </Card>
+  </CardGroup>
+</div>
 
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
-  </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="text-center mb-12">
+    <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-3">
+      Explore by Topic
+    </h2>
+    <p className="text-base text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+      Dive deeper into specific areas of the platform
+    </p>
+  </div>
 
-## Create beautiful pages
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <a 
+      href="/development/setup" 
+      className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] overflow-hidden no-underline hover:border-[#7c7c7c] dark:hover:border-[#7c7c7c] transition-colors bg-white dark:bg-[#1a1d27]"
+    >
+      <div className="p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+          Development Setup
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Learn how to set up your local development environment, configure dependencies, and start building.
+        </p>
+        <div className="flex items-center text-sm font-medium text-[#7c7c7c] group-hover:text-[#6a6a6a]">
+          Read guide
+          <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
 
-Everything you need to create world-class documentation.
+    <a 
+      href="/development/configuration" 
+      className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] overflow-hidden no-underline hover:border-[#7c7c7c] dark:hover:border-[#7c7c7c] transition-colors bg-white dark:bg-[#1a1d27]"
+    >
+      <div className="p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+          Configuration
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Configure environment variables, database connections, authentication settings, and more.
+        </p>
+        <div className="flex items-center text-sm font-medium text-[#7c7c7c] group-hover:text-[#6a6a6a]">
+          View configuration
+          <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+    <a 
+      href="/api/auth/overview" 
+      className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] overflow-hidden no-underline hover:border-[#7c7c7c] dark:hover:border-[#7c7c7c] transition-colors bg-white dark:bg-[#1a1d27]"
+    >
+      <div className="p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+          Authentication API
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Explore the NextAuth.js authentication API, endpoints, and session management strategies.
+        </p>
+        <div className="flex items-center text-sm font-medium text-[#7c7c7c] group-hover:text-[#6a6a6a]">
+          Explore API
+          <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
 
-## Need inspiration?
+    <a 
+      href="/api/database/schema" 
+      className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] overflow-hidden no-underline hover:border-[#7c7c7c] dark:hover:border-[#7c7c7c] transition-colors bg-white dark:bg-[#1a1d27]"
+    >
+      <div className="p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+          Database Schema
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Understand the database structure, models, and relationships powered by Prisma ORM.
+        </p>
+        <div className="flex items-center text-sm font-medium text-[#7c7c7c] group-hover:text-[#6a6a6a]">
+          View schema
+          <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="rounded-2xl bg-gradient-to-br from-[#7c7c7c] to-[#6a6a6a] p-8 sm:p-12 text-center">
+    <h2 className="text-3xl font-bold text-white mb-4">
+      Ready to get started?
+    </h2>
+    <p className="text-lg text-gray-100 mb-8 max-w-xl mx-auto">
+      Follow our quickstart guide to set up GAOTEV and start building your secure management system.
+    </p>
+    <a 
+      href="/quickstart"
+      className="inline-flex items-center px-6 py-3 rounded-lg bg-white text-[#7c7c7c] font-medium hover:bg-gray-100 transition-colors"
+    >
+      View Quickstart Guide
+      <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+      </svg>
+    </a>
+  </div>
+</div>

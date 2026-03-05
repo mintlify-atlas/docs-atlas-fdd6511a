@@ -1,0 +1,564 @@
+---
+title: 'Configuration'
+description: 'Configure GAOTEV for development and production environments'
+---
+
+## Environment Variables
+
+GAOTEV uses environment variables for configuration. Create a `.env` file in the project root with the following variables:
+
+### Required Variables
+
+<Warning>
+  Never commit your `.env` file to version control. The `.gitignore` file already includes `.env` to prevent accidental commits.
+</Warning>
+
+#### Database Configuration
+
+```bash .env
+# PostgreSQL connection string for Prisma
+DATABASE_URL="postgresql://username:password@localhost:5432/database_name"
+
+# Direct database connection (required for Prisma migrations)
+DIRECT_URL="postgresql://username:password@localhost:5432/database_name"
+```
+
+<Note>
+  **Why two database URLs?**
+  
+  - `DATABASE_URL`: Used by Prisma Client for connection pooling
+  - `DIRECT_URL`: Used by Prisma Migrate for direct database connections
+  
+  In development, both can point to the same database. In production with connection poolers (like PgBouncer or Supabase), they differ.
+</Note>
+
+**Connection String Format**:
+```
+postgresql://[user]:[password]@[host]:[port]/[database]?[parameters]
+```
+
+**Example with parameters**:
+```bash
+DATABASE_URL="postgresql://myuser:mypassword@localhost:5432/gaotev_dev?schema=public&connection_limit=5"
+```
+
+#### Authentication Configuration
+
+```bash .env
+# NextAuth.js secret for encrypting JWT tokens
+NEXTAUTH_SECRET="your-secret-key-here"
+
+# Application URL (used for callbacks and redirects)
+NEXTAUTH_URL="http://localhost:3000"
+```
+
+<Tip>
+  Generate a secure `NEXTAUTH_SECRET` using:
+  ```bash
+  openssl rand -base64 32
+  ```
+  Or online at [generate-secret.vercel.app](https://generate-secret.vercel.app/32)
+</Tip>
+
+### Environment-Specific Values
+
+<CodeGroup>
+```bash Development
+# .env.local or .env
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/gaotev_dev"
+DIRECT_URL="postgresql://postgres:postgres@localhost:5432/gaotev_dev"
+NEXTAUTH_SECRET="dev-secret-change-in-production"
+NEXTAUTH_URL="http://localhost:3000"
+```
+
+```bash Production
+# Set via deployment platform environment variables
+DATABASE_URL="postgresql://prod_user:prod_pass@db.example.com:5432/gaotev_prod?sslmode=require"
+DIRECT_URL="postgresql://prod_user:prod_pass@db.example.com:5432/gaotev_prod?sslmode=require"
+NEXTAUTH_SECRET="your-production-secret-min-32-chars"
+NEXTAUTH_URL="https://your-domain.com"
+```
+
+```bash Staging
+DATABASE_URL="postgresql://staging_user:staging_pass@staging-db.example.com:5432/gaotev_staging"
+DIRECT_URL="postgresql://staging_user:staging_pass@staging-db.example.com:5432/gaotev_staging"
+NEXTAUTH_SECRET="staging-secret-different-from-prod"
+NEXTAUTH_URL="https://staging.your-domain.com"
+```
+</CodeGroup>
+
+## Next.js Configuration
+
+The Next.js configuration is defined in `next.config.ts`:
+
+```typescript next.config.ts
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  /* config options here */
+};
+
+export default nextConfig;
+```
+
+### Common Configuration Options
+
+You can extend the configuration with various options:
+
+<Accordion title="Image Optimization">
+```typescript next.config.ts
+const nextConfig: NextConfig = {
+  images: {
+    domains: ['your-cdn.com'],
+    formats: ['image/avif', 'image/webp'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**.example.com',
+      },
+    ],
+  },
+};
+```
+</Accordion>
+
+<Accordion title="Environment Variables">
+```typescript next.config.ts
+const nextConfig: NextConfig = {
+  env: {
+    CUSTOM_KEY: process.env.CUSTOM_KEY,
+  },
+  // Or use publicRuntimeConfig for client-side access
+  publicRuntimeConfig: {
+    apiUrl: process.env.API_URL,
+  },
+};
+```
+</Accordion>
+
+<Accordion title="Headers and Redirects">
+```typescript next.config.ts
+const nextConfig: NextConfig = {
+  async headers() {
+    return [
+      {
+        source: '/api/:path*',
+        headers: [
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+        ],
+      },
+    ];
+  },
+  async redirects() {
+    return [
+      {
+        source: '/old-path',
+        destination: '/new-path',
+        permanent: true,
+      },
+    ];
+  },
+};
+```
+</Accordion>
+
+<Accordion title="Output Configuration">
+```typescript next.config.ts
+const nextConfig: NextConfig = {
+  output: 'standalone', // For Docker deployments
+  // output: 'export', // For static exports
+};
+```
+</Accordion>
+
+## Prisma Configuration
+
+### Prisma Config File
+
+The project uses `prisma.config.ts` for Prisma configuration:
+
+```typescript prisma.config.ts
+import "dotenv/config";
+import { defineConfig } from "prisma/config";
+
+export default defineConfig({
+  schema: "prisma/schema.prisma",
+  migrations: {
+    path: "prisma/migrations",
+  },
+  datasource: {
+    url: process.env["DATABASE_URL"],
+    directUrl: process.env["DIRECT_URL"],
+  },
+});
+```
+
+### Prisma Schema
+
+The database schema is defined in `prisma/schema.prisma`:
+
+```prisma prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+}
+```
+
+<Note>
+  **Current Schema Features**:
+  - Uses `cuid()` for unique identifiers
+  - Email is unique and indexed
+  - Passwords are hashed using bcrypt (handled in application layer)
+  - Automatic timestamp tracking with `createdAt`
+</Note>
+
+### Extending the Schema
+
+To add new models or fields:
+
+<Steps>
+  <Step title="Update Schema">
+    Edit `prisma/schema.prisma` to add your models:
+    ```prisma
+    model Post {
+      id        String   @id @default(cuid())
+      title     String
+      content   String?
+      published Boolean  @default(false)
+      authorId  String
+      author    User     @relation(fields: [authorId], references: [id])
+      createdAt DateTime @default(now())
+      updatedAt DateTime @updatedAt
+    }
+    
+    model User {
+      id        String   @id @default(cuid())
+      email     String   @unique
+      password  String
+      posts     Post[]
+      createdAt DateTime @default(now())
+    }
+    ```
+  </Step>
+  
+  <Step title="Create Migration">
+    Generate a new migration:
+    ```bash
+    npx prisma migrate dev --name add_post_model
+    ```
+  </Step>
+  
+  <Step title="Regenerate Client">
+    The client is regenerated automatically, but you can manually run:
+    ```bash
+    npx prisma generate
+    ```
+  </Step>
+</Steps>
+
+### Prisma Client Usage
+
+In the codebase, Prisma Client is instantiated in API routes:
+
+```typescript app/api/auth/[...nextauth]/route.ts
+import { PrismaClient } from "@prisma/client"
+
+const prisma = new PrismaClient()
+
+// Query example
+const user = await prisma.user.findUnique({
+  where: { email: credentials.email },
+})
+```
+
+<Warning>
+  **Best Practice**: In production, use a singleton pattern to avoid connection exhaustion:
+  
+  ```typescript lib/prisma.ts
+  import { PrismaClient } from '@prisma/client'
+  
+  const globalForPrisma = global as unknown as { prisma: PrismaClient }
+  
+  export const prisma =
+    globalForPrisma.prisma ||
+    new PrismaClient({
+      log: ['query'],
+    })
+  
+  if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+  ```
+</Warning>
+
+## Tailwind CSS Setup
+
+The project uses Tailwind CSS v4 with PostCSS:
+
+### PostCSS Configuration
+
+```javascript postcss.config.mjs
+const config = {
+  plugins: {
+    "@tailwindcss/postcss": {},
+  },
+};
+
+export default config;
+```
+
+### Global Styles
+
+Tailwind directives are included in `app/globals.css`:
+
+```css app/globals.css
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+```
+
+<Tip>
+  Tailwind CSS v4 uses a new architecture with `@tailwindcss/postcss` plugin. No separate `tailwind.config.js` file is needed unless you want to customize the default theme.
+</Tip>
+
+### Customizing Tailwind
+
+If you need custom theme values, create a `tailwind.config.ts` file:
+
+```typescript tailwind.config.ts
+import type { Config } from 'tailwindcss'
+
+const config: Config = {
+  content: [
+    './app/**/*.{js,ts,jsx,tsx,mdx}',
+    './components/**/*.{js,ts,jsx,tsx,mdx}',
+  ],
+  theme: {
+    extend: {
+      colors: {
+        primary: '#your-color',
+      },
+    },
+  },
+  plugins: [],
+}
+
+export default config
+```
+
+## TypeScript Configuration
+
+The project uses TypeScript with strict mode enabled:
+
+```json tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": ["node_modules"]
+}
+```
+
+### Key Configuration Options
+
+| Option | Value | Purpose |
+|--------|-------|----------|
+| `strict` | `true` | Enables all strict type checking |
+| `target` | `ES2017` | JavaScript version for output |
+| `jsx` | `react-jsx` | New JSX transform (no React import needed) |
+| `moduleResolution` | `bundler` | Modern module resolution |
+| `paths` | `{"@/*": ["./"]}` | Import alias for root directory |
+
+### Path Aliases
+
+Use the `@/` alias to import from the project root:
+
+```typescript
+// Instead of:
+import { something } from '../../../lib/utils'
+
+// Use:
+import { something } from '@/lib/utils'
+```
+
+## NextAuth.js Configuration
+
+Authentication is configured in `app/api/auth/[...nextauth]/route.ts`:
+
+```typescript app/api/auth/[...nextauth]/route.ts
+import NextAuth from "next-auth"
+import CredentialsProvider from "next-auth/providers/credentials"
+import { PrismaClient } from "@prisma/client"
+import bcrypt from "bcrypt"
+
+const prisma = new PrismaClient()
+
+const handler = NextAuth({
+  providers: [
+    CredentialsProvider({
+      name: "Credentials",
+      credentials: {
+        email: { label: "Email", type: "text" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          return null
+        }
+
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email },
+        })
+
+        if (!user) return null
+
+        const isValid = await bcrypt.compare(
+          credentials.password,
+          user.password
+        )
+
+        if (!isValid) return null
+
+        return {
+          id: user.id,
+          email: user.email,
+        }
+      },
+    }),
+  ],
+  session: {
+    strategy: "jwt",
+  },
+  secret: process.env.NEXTAUTH_SECRET,
+})
+
+export { handler as GET, handler as POST }
+```
+
+### Authentication Features
+
+<Accordion title="Session Strategy">
+  Uses JWT (JSON Web Token) strategy:
+  - No database session storage required
+  - Stateless authentication
+  - Tokens are encrypted using `NEXTAUTH_SECRET`
+  - Sessions stored in HTTP-only cookies
+</Accordion>
+
+<Accordion title="Password Hashing">
+  Passwords are hashed using bcrypt:
+  ```typescript
+  import bcrypt from 'bcrypt'
+  
+  // Hashing (during registration)
+  const hashedPassword = await bcrypt.hash(password, 10)
+  
+  // Verification (during login)
+  const isValid = await bcrypt.compare(password, user.password)
+  ```
+</Accordion>
+
+<Accordion title="Protected Routes">
+  Routes are protected via `middleware.ts`:
+  ```typescript middleware.ts
+  export { default } from "next-auth/middleware"
+  
+  export const config = {
+    matcher: ["/dashboard"],
+  }
+  ```
+  
+  Add more protected routes:
+  ```typescript
+  export const config = {
+    matcher: ["/dashboard/:path*", "/admin/:path*", "/profile/:path*"],
+  }
+  ```
+</Accordion>
+
+### Adding OAuth Providers
+
+To add OAuth providers (Google, GitHub, etc.):
+
+```typescript
+import NextAuth from "next-auth"
+import GoogleProvider from "next-auth/providers/google"
+import GitHubProvider from "next-auth/providers/github"
+
+const handler = NextAuth({
+  providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    }),
+    GitHubProvider({
+      clientId: process.env.GITHUB_ID!,
+      clientSecret: process.env.GITHUB_SECRET!,
+    }),
+    // ... existing CredentialsProvider
+  ],
+  // ... rest of config
+})
+```
+
+## Configuration Best Practices
+
+<Note>
+  **Security Checklist**:
+  - ✅ Never commit `.env` files
+  - ✅ Use different secrets for each environment
+  - ✅ Enable SSL for production database connections
+  - ✅ Use strong `NEXTAUTH_SECRET` (minimum 32 characters)
+  - ✅ Rotate secrets periodically
+  - ✅ Use environment variable management in production (Vercel, AWS Secrets Manager, etc.)
+</Note>
+
+<Tip>
+  **Development Tips**:
+  - Use `.env.local` for local overrides (not committed)
+  - Use `.env.development` for shared development config
+  - Use `.env.production` for production defaults
+  - Next.js loads these automatically based on `NODE_ENV`
+</Tip>
+
+## Next Steps
+
+- Learn about [Deployment](/development/deployment) strategies
+- Explore the [Development Setup](/development/setup) guide
+- Review Next.js [Environment Variables documentation](https://nextjs.org/docs/app/building-your-application/configuring/environment-variables)
