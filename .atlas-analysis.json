@@ -1,0 +1,74 @@
+{
+  "projectType": "saas",
+  "projectName": "GAOTEV",
+  "projectDescription": "A Next.js management system with user authentication and protected dashboard access.",
+  "theme": "almond",
+  "primaryColor": "#7c7c7c",
+  "lightColor": "#070707",
+  "darkColor": "#c4c4c4",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/authentication",
+              "features/dashboard",
+              "features/database"
+            ]
+          },
+          {
+            "group": "Development",
+            "pages": [
+              "development/setup",
+              "development/configuration",
+              "development/deployment"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Authentication",
+            "pages": [
+              "api/auth/overview",
+              "api/auth/nextauth"
+            ]
+          },
+          {
+            "group": "Database",
+            "pages": [
+              "api/database/schema",
+              "api/database/prisma"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "NextAuth.js credential-based authentication",
+    "Protected dashboard with session management",
+    "Prisma ORM with PostgreSQL database",
+    "Modern UI with Tailwind CSS and Lucide icons",
+    "TypeScript support with Next.js 16"
+  ],
+  "publicApiSurface": [
+    "/api/auth/[...nextauth] - NextAuth authentication endpoint",
+    "/login - User login page",
+    "/dashboard - Protected dashboard page",
+    "User model with email/password authentication",
+    "Session management with JWT strategy"
+  ]
+}
